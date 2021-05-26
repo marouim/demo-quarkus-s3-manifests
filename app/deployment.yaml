@@ -1,0 +1,63 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  annotations:
+    image.openshift.io/triggers: |-
+      [
+        {
+          "from": {
+            "kind": "ImageStreamTag",
+            "name": "s3quarkus/quarkus-s3:latest"
+          },
+          "fieldPath": "spec.template.spec.containers[0].image"
+        }
+      ]
+  name: quarkus-s3
+  namespace: s3quarkus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quarkus-s3
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: quarkus-s3
+    spec:
+      containers:
+        - resources:
+            limits:
+              cpu: "6"
+            requests:
+              cpu: "5"
+          terminationMessagePath: /dev/termination-log
+          name: quarkus-s3
+          command:
+          - tail
+          - -f
+          - /dev/null
+          
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: Always
+          terminationMessagePolicy: File
+          image: 'quay.io/mouimet/quarkus-s3:latest'
+          envFrom:
+            - configMapRef:
+                name: quarkus-s3
+            - secretRef:
+                name: quarkus-s3
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600

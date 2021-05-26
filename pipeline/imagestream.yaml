@@ -1,0 +1,7 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: quarkus-s3
+spec:
+  lookupPolicy:
+    local: false

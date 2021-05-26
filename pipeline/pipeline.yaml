@@ -1,0 +1,113 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: quarkus-s3
+spec:
+  workspaces:
+    - name: pipeline-workspace
+  params:
+    - name: git-url
+      type: string
+      description: url of the git repo for the code of deployment
+    - name: git-revision
+      type: string
+      description: revision to be used from repo of the code for deployment
+      default: "master"
+    - name: internal_image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: image-registry.openshift-image-registry.svc:5000/s3quarkus/quarkus-s3
+    - name: image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: quay.io/mouimet/quarkus-s3
+    - name: app-name
+      type: string
+      description: Application name
+      default: quarkus-s3
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: pipeline-workspace
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: $(params.git-revision)
+
+    - name: s2i-build
+      taskRef:
+        name: s2i-java-11
+        kind: ClusterTask
+      params:
+        - name: IMAGE
+          value: $(params.internal_image_dest_url)
+        - name: TLSVERIFY
+          value: "false"
+        - name: MAVEN_ARGS_APPEND
+          value: ""
+      runAfter:
+        - fetch-repository 
+      workspaces:
+        - name: source
+          workspace: pipeline-workspace
+
+    - name: push-to-quayio
+      taskRef:
+        name: push-image
+        kind: Task
+      params:
+        - name: src-image
+          value: $(params.internal_image_dest_url)
+        - name: dest-image
+          value: $(params.image_dest_url)
+      runAfter:
+        - s2i-build
+
+    - name: image-scan
+      params:
+        - name: image
+          value: $(params.image_dest_url)
+        - name: rox_api_token
+          value: roxsecrets
+        - name: rox_central_endpoint
+          value: roxsecrets
+        - name: output_format
+          value: pretty
+      taskRef:
+        kind: ClusterTask
+        name: rox-image-scan
+      runAfter:
+        - push-to-quayio
+
+    - name: image-check
+      params:
+        - name: image
+          value: $(params.image_dest_url)
+        - name: rox_api_token
+          value: roxsecrets
+        - name: rox_central_endpoint
+          value: roxsecrets
+      taskRef:
+        kind: ClusterTask
+        name: rox-image-check
+      runAfter:
+        - image-scan
+
+    - name: tag-prod
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      runAfter:
+        - image-check
+      params:
+        - name: ARGS
+          value: ["tag", "$(params.app-name):latest", "$(params.app-name):prod"]

@@ -1,0 +1,54 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: quarkus-s3-test-scan
+spec:
+  workspaces:
+    - name: pipeline-workspace
+  params:
+    - name: git-url
+      type: string
+      description: url of the git repo for the code of deployment
+    - name: git-revision
+      type: string
+      description: revision to be used from repo of the code for deployment
+      default: "master"
+    - name: internal_image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: image-registry.openshift-image-registry.svc:5000/s3quarkus/quarkus-s3
+    - name: image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: quay.io/mouimet/quarkus-s3
+      
+  tasks:
+
+    - name: image-scan
+      params:
+        - name: image
+          value: $(params.image_dest_url)
+        - name: rox_api_token
+          value: roxsecrets
+        - name: rox_central_endpoint
+          value: roxsecrets
+        - name: output_format
+          value: pretty
+      taskRef:
+        kind: ClusterTask
+        name: rox-image-scan
+
+
+    - name: image-check
+      params:
+        - name: image
+          value: $(params.image_dest_url)
+        - name: rox_api_token
+          value: roxsecrets
+        - name: rox_central_endpoint
+          value: roxsecrets
+      taskRef:
+        kind: ClusterTask
+        name: rox-image-check
+      runAfter:
+        - image-scan

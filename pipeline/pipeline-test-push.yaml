@@ -1,0 +1,37 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: quarkus-s3-tmp
+spec:
+  workspaces:
+    - name: pipeline-workspace
+  params:
+    - name: git-url
+      type: string
+      description: url of the git repo for the code of deployment
+    - name: git-revision
+      type: string
+      description: revision to be used from repo of the code for deployment
+      default: "master"
+    - name: internal_image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: image-registry.openshift-image-registry.svc:5000/s3quarkus/quarkus-s3
+    - name: image_dest_url
+      type: string
+      description: External registry location to copy image to
+      default: quay.io/mouimet/quarkus-s3
+      
+  tasks:
+
+    - name: push-to-quayio
+      taskRef:
+        name: push-image
+        kind: Task
+      params:
+        - name: src-image
+          value: $(params.internal_image_dest_url)
+        - name: dest-image
+          value: $(params.image_dest_url)
+
+

@@ -1,0 +1,21 @@
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineRun
+metadata:
+
+  generateName: quarkus-s3-run-
+spec:
+  pipelineRef:
+    name: quarkus-s3
+
+  params:
+    - name: "git-url"
+      value: "https://github.com/marouim/demo-quarkus-s3.git"
+    - name: "git-revision"
+      value: "main"
+    - name: image_dest_url
+      value: quay.io/mouimet/quarkus-s3
+
+  workspaces:
+  - name: pipeline-workspace
+    persistentVolumeClaim:
+      claimName: pipeline-workspace
